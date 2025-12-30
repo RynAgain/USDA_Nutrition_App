@@ -81,18 +81,31 @@
                 width: 100%;
                 border-collapse: collapse;
                 margin-top: 12px;
+                background: white;
+                border-radius: 8px;
+                overflow: hidden;
             }
 
             .usda-nutrient-table th,
             .usda-nutrient-table td {
-                padding: 8px;
+                padding: 12px;
                 text-align: left;
                 border-bottom: 1px solid ${COLORS.border};
             }
 
             .usda-nutrient-table th {
-                background: ${COLORS.hover};
+                background: ${COLORS.primary};
                 font-weight: 600;
+                color: white;
+                position: sticky;
+                top: 0;
+            }
+
+            .usda-nutrient-table tbody tr:hover {
+                background: ${COLORS.hover};
+            }
+
+            .usda-nutrient-table td {
                 color: ${COLORS.text};
             }
 
@@ -100,6 +113,10 @@
                 text-align: right;
                 font-weight: 600;
                 color: ${COLORS.primary};
+            }
+
+            .usda-nutrient-table tbody tr:last-child td {
+                border-bottom: none;
             }
 
             .usda-external-link {
