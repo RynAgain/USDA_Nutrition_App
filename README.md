@@ -2,18 +2,33 @@
 
 A beautiful Tampermonkey userscript that provides a Whole Foods-themed interface for querying the USDA FoodData Central API. Search for nutritional information on thousands of food items with an elegant, easy-to-use interface.
 
-![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Architecture](https://img.shields.io/badge/architecture-modular-blue.svg)
 
 ## Features
 
-- 🎨 **Whole Foods Themed UI** - Clean, professional design inspired by Whole Foods Market
-- 🔍 **Powerful Search** - Search across branded foods, foundation foods, and survey foods
-- 🔐 **Secure API Key Storage** - Your API key is stored locally using Tampermonkey's secure storage
-- 📊 **Nutritional Information** - View calories, protein, carbs, fat, and more
-- 🚀 **Fast & Lightweight** - Minimal performance impact on your browsing
+### Core Features
+- 🎨 **Whole Foods Themed UI** - Clean, professional design with green (#00754a) color scheme
+- 🍗 **Chicken Emoji Logo** - Fun and recognizable branding
+- 🖱️ **Draggable Panel** - Drag from header to reposition anywhere on screen
+- 🔍 **Multiple Search Modes** - Text search, FDC ID lookup, or NDB Number search
+- 🎯 **Data Type Filtering** - Filter by Branded, Foundation, or Survey foods
+- ⚙️ **Customizable Display** - Choose up to 6 nutrients to show in results
+- 📊 **Detailed View** - Click any result to see comprehensive nutrition data
+
+### API Integration
+- 🔐 **Secure API Key Storage** - Stored locally using Tampermonkey's secure storage
+- 📈 **Rate Limiting** - Tracks 1000 requests/hour with visual progress bar
 - 🔄 **Auto-Updates** - Automatically receives updates from GitHub
+- ✅ **Connection Testing** - Test your API key before using
+
+### User Experience
+- 🚀 **Fast & Lightweight** - Minimal performance impact on your browsing
 - 🌐 **Works Everywhere** - Available on any website with a floating button
+- ⌨️ **Keyboard Shortcut** - Press Ctrl+Shift+U to toggle panel
+- 🎭 **Smooth Animations** - Polished hover effects and transitions
+- 📱 **Responsive Design** - Works on different screen sizes
 
 ## Screenshots
 
@@ -42,16 +57,25 @@ The script adds a floating green button in the bottom-right corner of any webpag
 ### Install the Script
 
 **Option 1: Direct Install (Recommended)**
-1. Click here to install: [usda-nutrition-lookup.user.js](https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/usda-nutrition-lookup.user.js)
+1. Click here to install: [usda-nutrition-lookup-modular.user.js](https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/usda-nutrition-lookup-modular.user.js)
 2. Tampermonkey will open and show the script
 3. Click "Install"
+4. The script will automatically load all required modules from GitHub
 
 **Option 2: Manual Install**
 1. Open Tampermonkey dashboard in your browser
 2. Click the "+" icon to create a new script
-3. Copy the contents of [`usda-nutrition-lookup.user.js`](./usda-nutrition-lookup.user.js)
+3. Copy the contents of [`usda-nutrition-lookup-modular.user.js`](./usda-nutrition-lookup-modular.user.js)
 4. Paste into the editor
 5. Click File → Save (or Ctrl+S / Cmd+S)
+
+**Note**: The modular version automatically loads 6 separate modules:
+- Core.js - Configuration and utilities
+- UI.js - Interface components
+- Search.js - Search functionality
+- Settings.js - Settings modal
+- Dragging.js - Panel dragging
+- DetailView.js - Detailed food information
 
 ## Setup & Usage
 
@@ -67,15 +91,35 @@ The script adds a floating green button in the bottom-right corner of any webpag
 
 ### Searching for Foods
 
-1. Click the green floating button to open the panel
-2. Enter a food name in the search bar (e.g., "apple", "chicken breast", "milk")
-3. Select which food types to search:
+1. Click the green floating button (bottom-right) to open the panel
+2. Choose your search mode:
+   - **Text Search**: Search by food name (e.g., "apple", "chicken breast")
+   - **FDC ID**: Look up by FoodData Central ID (e.g., "534358")
+   - **NDB Number**: Look up by National Database Number (e.g., "09003")
+3. For text search, select which food types to include:
    - **Branded Foods**: Commercial products with brand names
    - **Foundation Foods**: Minimally processed foods with detailed nutrient data
    - **Survey Foods**: Foods from USDA dietary surveys
-4. Click "Search" or press Enter
-5. Browse the results with nutritional information
-6. Click any result card to view complete details on the USDA website
+4. Enter your search term and click "Search" or press Enter
+5. Browse the results with customizable nutritional information
+6. **Click any result card** to view comprehensive details in a modal
+
+### Viewing Detailed Information
+
+When you click a food result:
+- See complete food metadata (Type, FDC ID, Brand, NDB Number)
+- View key nutrients in an easy-to-read grid
+- Browse ALL available nutrients in a sortable table
+- Click "View on USDA Website" for official documentation
+
+### Customizing Nutrient Display
+
+1. Click the settings gear icon
+2. Scroll to "Display Nutrients"
+3. Select up to 6 nutrients to show in search results
+4. Common options: Energy, Protein, Carbs, Fat, Fiber, Sugars, Vitamins, Minerals
+5. Click "Save Settings"
+6. Your preferences are saved and used for all future searches
 
 ### Managing Settings
 
@@ -96,36 +140,43 @@ This script uses the [USDA FoodData Central API](https://fdc.nal.usda.gov/api-gu
 ### API Endpoints Used
 
 - `GET /foods/search` - Search for foods by query string
+- `GET /food/{fdcId}` - Get specific food by FDC ID
 - Supports filtering by data type (Branded, Foundation, Survey)
 - Returns up to 25 results per search
+- Rate limited to 1000 requests per hour
 
-## Features in Detail
+## Architecture
 
-### Whole Foods Theme
-- Professional green color scheme (#00754a)
-- Clean, modern interface design
-- Smooth animations and transitions
-- Responsive layout
+### Modular Design
 
-### Search Capabilities
-- Real-time search with instant results
-- Filter by multiple food data types
-- View key nutrients at a glance
-- Direct links to full USDA data
+This script uses a modular architecture for better maintainability and extensibility. See [`MODULAR_ARCHITECTURE.md`](./MODULAR_ARCHITECTURE.md) for detailed documentation.
 
-### Security & Privacy
-- API key stored locally in your browser
-- No data sent to third parties
-- All requests go directly to USDA API
-- Open source code for transparency
+**Module Structure:**
+```
+Main Script (usda-nutrition-lookup-modular.user.js)
+├── Core.js - Configuration, state, utilities
+├── UI.js - Main interface components
+├── Search.js - Search functionality
+├── Settings.js - Settings modal
+├── Dragging.js - Panel dragging
+└── DetailView.js - Detailed food view
+```
 
-### User Experience
-- Non-intrusive floating button
-- Collapsible panel design
-- Works on any website
-- Keyboard shortcuts (Enter to search)
-- Loading indicators
-- Error handling with helpful messages
+**Benefits:**
+- ✅ Separation of concerns
+- ✅ Easy to maintain and extend
+- ✅ Individual modules can be updated
+- ✅ Reusable components
+- ✅ Better code organization
+
+### Module Communication
+
+Modules communicate through:
+- **Global Objects**: `USDA_CONFIG`, `USDA_STATE`, `USDA_UTILS`
+- **Custom Events**: `usda:openSettings`, `usda:showDetail`, `usda:requestCountUpdated`
+- **DOM Elements**: Shared elements with event listeners
+
+For developers interested in extending the script, see [`multi-tampermonkey-guide.md`](./multi-tampermonkey-guide.md) for patterns and best practices.
 
 ## Troubleshooting
 
@@ -185,11 +236,28 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Changelog
 
+### Version 2.0.0 (2025-12-30)
+- ✨ **Complete modular refactor** - Separated into 6 focused modules
+- ✨ **Draggable panel** - Drag from header to reposition
+- ✨ **Detailed food view** - Click results to see comprehensive nutrition data
+- ✨ **Multiple search modes** - Text, FDC ID, and NDB Number search
+- ✨ **Customizable nutrients** - Choose up to 6 nutrients to display
+- ✨ **Improved styling** - Better color scheme for nutrient tables
+- ✨ **Keyboard shortcut** - Ctrl+Shift+U to toggle panel
+- ✨ **Request tracking** - Visual progress bar for API usage
+- 🐛 **Bug fixes** - Improved error handling and edge cases
+
+### Version 1.1.0 (2025-12-30)
+- Added FDC ID and NDB Number search modes
+- Added API rate limiting (1000 requests/hour)
+- Added request counter with visual progress bar
+- Improved API connection testing
+
 ### Version 1.0.0 (2025-12-30)
 - Initial release
-- Whole Foods themed UI
+- Whole Foods themed UI with 🍗 chicken emoji
 - USDA FoodData Central API integration
-- Search functionality with filters
+- Text search functionality with data type filters
 - Settings panel with API key management
 - Nutritional information display
 - Auto-update support
