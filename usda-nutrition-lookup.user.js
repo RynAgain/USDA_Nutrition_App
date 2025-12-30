@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         USDA Nutrition Lookup - Whole Foods Theme
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.1.0
 // @description  Query USDA FoodData Central API with a Whole Foods themed interface
 // @author       RynAgain
 // @match        *://*/*
@@ -36,10 +36,18 @@
     // API Configuration
     const API_BASE_URL = 'https://api.nal.usda.gov/fdc/v1';
     const API_KEY_STORAGE = 'usda_api_key';
+    const API_REQUESTS_STORAGE = 'usda_api_requests';
+    const NUTRIENT_PREFS_STORAGE = 'usda_nutrient_prefs';
+    const API_RATE_LIMIT = 1000; // 1000 requests per hour
+
+    // Default nutrients to display
+    const DEFAULT_NUTRIENTS = ['Energy', 'Protein', 'Carbohydrate', 'Total lipid (fat)', 'Fiber', 'Sugars'];
 
     // State Management
     let isVisible = false;
     let currentResults = [];
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
 
     // Create Main Container
     function createMainUI() {
@@ -53,7 +61,7 @@
             </div>
             <div id="usda-app-panel" style="display: none;">
                 <div id="usda-app-header">
-                    <div class="usda-logo">
+                    <div class="usda-logo" id="usda-drag-handle" style="cursor: move;">
                         <span style="font-size: 32px;">🍗</span>
                         <h2>USDA Nutrition Lookup</h2>
                     </div>
@@ -65,6 +73,20 @@
                 </div>
                 <div id="usda-app-content">
                     <div id="usda-search-section">
+                        <div class="usda-search-mode">
+                            <label>
+                                <input type="radio" name="search-mode" value="text" checked>
+                                Text Search
+                            </label>
+                            <label>
+                                <input type="radio" name="search-mode" value="fdc">
+                                FDC ID
+                            </label>
+                            <label>
+                                <input type="radio" name="search-mode" value="ndb">
+                                NDB Number
+                            </label>
+                        </div>
                         <div class="usda-search-bar">
                             <input type="text" id="usda-search-input" placeholder="Search for food items (e.g., 'apple', 'chicken breast')...">
                             <button id="usda-search-btn">
@@ -74,7 +96,7 @@
                                 Search
                             </button>
                         </div>
-                        <div class="usda-search-options">
+                        <div class="usda-search-options" id="usda-data-type-filters">
                             <label>
                                 <input type="checkbox" id="usda-branded" checked>
                                 Branded Foods
@@ -107,10 +129,38 @@
                             <small>Get your free API key at <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank">FoodData Central</a></small>
                         </div>
                         <div class="usda-form-group">
+                            <label>API Usage Tracker</label>
+                            <div class="usda-usage-tracker">
+                                <div class="usda-usage-info">
+                                    <span id="usda-request-count">0</span> / ${API_RATE_LIMIT} requests this hour
+                                </div>
+                                <div class="usda-usage-bar">
+                                    <div class="usda-usage-fill" id="usda-usage-fill" style="width: 0%"></div>
+                                </div>
+                                <small>Resets at: <span id="usda-reset-time">--:--</span></small>
+                            </div>
+                            <button id="usda-reset-counter" class="usda-btn-secondary" style="margin-top: 8px;">Reset Counter</button>
+                        </div>
+                        <div class="usda-form-group">
+                            <label>Display Nutrients (select up to 6)</label>
+                            <div id="usda-nutrient-checkboxes" class="usda-nutrient-grid"></div>
+                        </div>
+                        <div class="usda-form-group">
                             <button id="usda-save-settings" class="usda-btn-primary">Save Settings</button>
                             <button id="usda-test-api" class="usda-btn-secondary">Test API Connection</button>
                         </div>
                         <div id="usda-settings-message"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="usda-detail-modal" style="display: none;">
+                <div class="usda-modal-content usda-detail-content">
+                    <div class="usda-modal-header">
+                        <h3 id="usda-detail-title">Food Details</h3>
+                        <button id="usda-close-detail">&times;</button>
+                    </div>
+                    <div class="usda-modal-body" id="usda-detail-body">
+                        <!-- Details will be populated here -->
                     </div>
                 </div>
             </div>
@@ -161,6 +211,11 @@
                 overflow: hidden;
             }
 
+            #usda-app-panel.dragging {
+                cursor: move;
+                user-select: none;
+            }
+
             #usda-app-header {
                 background: linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.primaryDark} 100%);
                 color: white;
@@ -174,10 +229,6 @@
                 display: flex;
                 align-items: center;
                 gap: 12px;
-            }
-
-            .usda-logo svg {
-                fill: white;
             }
 
             .usda-logo h2 {
@@ -208,6 +259,29 @@
                 flex: 1;
                 overflow-y: auto;
                 padding: 20px;
+            }
+
+            .usda-search-mode {
+                display: flex;
+                gap: 16px;
+                margin-bottom: 12px;
+                padding: 12px;
+                background: ${COLORS.hover};
+                border-radius: 8px;
+            }
+
+            .usda-search-mode label {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 13px;
+                font-weight: 500;
+                color: ${COLORS.text};
+                cursor: pointer;
+            }
+
+            .usda-search-mode input[type="radio"] {
+                cursor: pointer;
             }
 
             .usda-search-bar {
@@ -301,6 +375,7 @@
                 font-size: 12px;
                 color: ${COLORS.textLight};
                 margin-bottom: 8px;
+                flex-wrap: wrap;
             }
 
             .usda-result-badge {
@@ -334,7 +409,7 @@
                 font-weight: 600;
             }
 
-            #usda-settings-modal {
+            #usda-settings-modal, #usda-detail-modal {
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -352,7 +427,14 @@
                 border-radius: 12px;
                 width: 90%;
                 max-width: 500px;
+                max-height: 90vh;
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                display: flex;
+                flex-direction: column;
+            }
+
+            .usda-detail-content {
+                max-width: 700px;
             }
 
             .usda-modal-header {
@@ -370,7 +452,7 @@
                 font-size: 20px;
             }
 
-            #usda-close-settings {
+            #usda-close-settings, #usda-close-detail {
                 background: none;
                 border: none;
                 color: white;
@@ -384,6 +466,7 @@
 
             .usda-modal-body {
                 padding: 24px;
+                overflow-y: auto;
             }
 
             .usda-form-group {
@@ -425,6 +508,27 @@
 
             .usda-form-group small a:hover {
                 text-decoration: underline;
+            }
+
+            .usda-nutrient-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+                max-height: 200px;
+                overflow-y: auto;
+                padding: 12px;
+                background: ${COLORS.hover};
+                border-radius: 8px;
+            }
+
+            .usda-nutrient-grid label {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 13px;
+                font-weight: normal;
+                cursor: pointer;
+                margin-bottom: 0;
             }
 
             .usda-btn-primary,
@@ -507,12 +611,111 @@
                 margin-bottom: 16px;
                 opacity: 0.5;
             }
+
+            .usda-usage-tracker {
+                background: ${COLORS.hover};
+                padding: 16px;
+                border-radius: 8px;
+                margin-top: 8px;
+            }
+
+            .usda-usage-info {
+                font-size: 14px;
+                font-weight: 600;
+                color: ${COLORS.text};
+                margin-bottom: 12px;
+            }
+
+            .usda-usage-info span {
+                color: ${COLORS.primary};
+                font-size: 18px;
+            }
+
+            .usda-usage-bar {
+                height: 24px;
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                margin-bottom: 8px;
+                border: 2px solid ${COLORS.border};
+            }
+
+            .usda-usage-fill {
+                height: 100%;
+                background: linear-gradient(90deg, ${COLORS.primary} 0%, ${COLORS.secondary} 100%);
+                transition: width 0.3s ease, background 0.3s ease;
+            }
+
+            .usda-usage-fill.warning {
+                background: linear-gradient(90deg, ${COLORS.secondary} 0%, #ff9800 100%);
+            }
+
+            .usda-usage-fill.danger {
+                background: linear-gradient(90deg, #ff9800 0%, ${COLORS.error} 100%);
+            }
+
+            .usda-usage-tracker small {
+                display: block;
+                color: ${COLORS.textLight};
+                font-size: 12px;
+            }
+
+            .usda-detail-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+                margin-top: 16px;
+            }
+
+            .usda-detail-item {
+                padding: 12px;
+                background: ${COLORS.hover};
+                border-radius: 8px;
+            }
+
+            .usda-detail-item strong {
+                display: block;
+                color: ${COLORS.text};
+                margin-bottom: 4px;
+            }
+
+            .usda-detail-item span {
+                color: ${COLORS.primary};
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            .usda-detail-section {
+                margin-top: 20px;
+            }
+
+            .usda-detail-section h4 {
+                color: ${COLORS.primary};
+                margin-bottom: 12px;
+            }
+
+            .usda-external-link {
+                display: inline-block;
+                margin-top: 16px;
+                padding: 10px 20px;
+                background: ${COLORS.primary};
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: 600;
+                transition: background 0.2s;
+            }
+
+            .usda-external-link:hover {
+                background: ${COLORS.primaryDark};
+            }
         `;
 
         document.head.appendChild(style);
         document.body.appendChild(container);
 
         initializeEventListeners();
+        initializeDragging();
         checkApiKey();
     }
 
@@ -526,6 +729,10 @@
         document.getElementById('usda-close-settings').addEventListener('click', closeSettings);
         document.getElementById('usda-save-settings').addEventListener('click', saveSettings);
         document.getElementById('usda-test-api').addEventListener('click', testApiConnection);
+        document.getElementById('usda-reset-counter').addEventListener('click', resetRequestCounter);
+
+        // Detail modal
+        document.getElementById('usda-close-detail').addEventListener('click', closeDetailModal);
 
         // Search
         document.getElementById('usda-search-btn').addEventListener('click', performSearch);
@@ -533,261 +740,51 @@
             if (e.key === 'Enter') performSearch();
         });
 
-        // Close modal on outside click
+        // Search mode change
+        document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
+            radio.addEventListener('change', updateSearchMode);
+        });
+
+        // Close modals on outside click
         document.getElementById('usda-settings-modal').addEventListener('click', (e) => {
             if (e.target.id === 'usda-settings-modal') closeSettings();
         });
+        document.getElementById('usda-detail-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'usda-detail-modal') closeDetailModal();
+        });
     }
 
-    // Toggle Panel Visibility
-    function togglePanel() {
-        isVisible = !isVisible;
+    // Initialize Dragging
+    function initializeDragging() {
         const panel = document.getElementById('usda-app-panel');
-        panel.style.display = isVisible ? 'flex' : 'none';
-    }
+        const dragHandle = document.getElementById('usda-drag-handle');
 
-    // Settings Functions
-    function openSettings() {
-        const modal = document.getElementById('usda-settings-modal');
-        const input = document.getElementById('usda-api-key-input');
-        const apiKey = GM_getValue(API_KEY_STORAGE, '');
-        input.value = apiKey;
-        modal.style.display = 'flex';
-    }
-
-    function closeSettings() {
-        document.getElementById('usda-settings-modal').style.display = 'none';
-        document.getElementById('usda-settings-message').className = '';
-        document.getElementById('usda-settings-message').style.display = 'none';
-    }
-
-    function saveSettings() {
-        const apiKey = document.getElementById('usda-api-key-input').value.trim();
-        const messageEl = document.getElementById('usda-settings-message');
-
-        if (!apiKey) {
-            messageEl.textContent = 'Please enter an API key';
-            messageEl.className = 'error';
-            return;
-        }
-
-        GM_setValue(API_KEY_STORAGE, apiKey);
-        messageEl.textContent = 'API key saved successfully!';
-        messageEl.className = 'success';
-
-        setTimeout(() => {
-            closeSettings();
-        }, 1500);
-    }
-
-    function testApiConnection() {
-        const apiKey = document.getElementById('usda-api-key-input').value.trim();
-        const messageEl = document.getElementById('usda-settings-message');
-
-        if (!apiKey) {
-            messageEl.textContent = 'Please enter an API key first';
-            messageEl.className = 'error';
-            return;
-        }
-
-        messageEl.textContent = 'Testing connection...';
-        messageEl.className = 'success';
-        messageEl.style.display = 'block';
-
-        // Test with a simple search
-        const testUrl = `${API_BASE_URL}/foods/search?query=apple&pageSize=1&api_key=${encodeURIComponent(apiKey)}`;
-        
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: testUrl,
-            onload: function(response) {
-                console.log('API Test Response:', response.status, response.statusText);
-                console.log('Response Text:', response.responseText);
-                
-                if (response.status === 200) {
-                    try {
-                        const data = JSON.parse(response.responseText);
-                        if (data.foods && data.foods.length >= 0) {
-                            messageEl.textContent = 'API connection successful! ✓';
-                            messageEl.className = 'success';
-                        } else {
-                            messageEl.textContent = 'Unexpected API response format';
-                            messageEl.className = 'error';
-                        }
-                    } catch (e) {
-                        messageEl.textContent = 'Error parsing API response';
-                        messageEl.className = 'error';
-                        console.error('Parse error:', e);
-                    }
-                } else if (response.status === 403) {
-                    messageEl.textContent = 'Invalid API key. Please check your key.';
-                    messageEl.className = 'error';
-                } else if (response.status === 429) {
-                    messageEl.textContent = 'Rate limit exceeded. Please try again later.';
-                    messageEl.className = 'error';
-                } else {
-                    messageEl.textContent = `API test failed (${response.status}): ${response.statusText}`;
-                    messageEl.className = 'error';
-                }
-            },
-            onerror: function(error) {
-                console.error('API Test Error:', error);
-                messageEl.textContent = 'Connection error. Please check your internet connection.';
-                messageEl.className = 'error';
-            },
-            ontimeout: function() {
-                messageEl.textContent = 'Connection timeout. Please try again.';
-                messageEl.className = 'error';
-            },
-            timeout: 10000
+        dragHandle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            panel.classList.add('dragging');
+            
+            const rect = panel.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            
+            e.preventDefault();
         });
-    }
 
-    function checkApiKey() {
-        const apiKey = GM_getValue(API_KEY_STORAGE, '');
-        if (!apiKey) {
-            setTimeout(() => {
-                openSettings();
-            }, 1000);
-        }
-    }
-
-    // Search Functions
-    function performSearch() {
-        const query = document.getElementById('usda-search-input').value.trim();
-        const apiKey = GM_getValue(API_KEY_STORAGE, '');
-
-        if (!apiKey) {
-            showMessage('Please set your API key in settings first', 'error');
-            openSettings();
-            return;
-        }
-
-        if (!query) {
-            showMessage('Please enter a search term', 'error');
-            return;
-        }
-
-        // Get selected data types
-        const dataTypes = [];
-        if (document.getElementById('usda-branded').checked) dataTypes.push('Branded');
-        if (document.getElementById('usda-foundation').checked) dataTypes.push('Foundation');
-        if (document.getElementById('usda-survey').checked) dataTypes.push('Survey (FNDDS)');
-
-        if (dataTypes.length === 0) {
-            showMessage('Please select at least one food type', 'error');
-            return;
-        }
-
-        showLoading();
-
-        const dataTypeParam = dataTypes.join(',');
-        const url = `${API_BASE_URL}/foods/search?query=${encodeURIComponent(query)}&dataType=${encodeURIComponent(dataTypeParam)}&pageSize=25&api_key=${apiKey}`;
-
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: url,
-            onload: function(response) {
-                if (response.status === 200) {
-                    const data = JSON.parse(response.responseText);
-                    displayResults(data.foods || []);
-                } else {
-                    showMessage(`Search failed: ${response.statusText}`, 'error');
-                }
-            },
-            onerror: function() {
-                showMessage('Connection error. Please try again.', 'error');
-            }
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const panel = document.getElementById('usda-app-panel');
+            let newX = e.clientX - dragOffset.x;
+            let newY = e.clientY - dragOffset.y;
+            
+            // Keep panel within viewport
+            newX = Math.max(0, Math.min(newX, window.innerWidth - panel.offsetWidth));
+            newY = Math.max(0, Math.min(newY, window.innerHeight - panel.offsetHeight));
+            
+            panel.style.left = newX + 'px';
+            panel.style.top = newY + 'px';
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
         });
-    }
 
-    function showLoading() {
-        const container = document.getElementById('usda-results-container');
-        container.innerHTML = `
-            <div class="usda-loading">
-                <div class="usda-spinner"></div>
-                <p>Searching USDA database...</p>
-            </div>
-        `;
-    }
-
-    function displayResults(foods) {
-        const container = document.getElementById('usda-results-container');
-
-        if (foods.length === 0) {
-            container.innerHTML = `
-                <div class="usda-empty-state">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="${COLORS.textLight}">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-                    </svg>
-                    <p>No results found. Try a different search term.</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = foods.map(food => createFoodCard(food)).join('');
-    }
-
-    function createFoodCard(food) {
-        const nutrients = food.foodNutrients || [];
-        
-        // Extract key nutrients
-        const getNutrient = (name) => {
-            const nutrient = nutrients.find(n => n.nutrientName && n.nutrientName.toLowerCase().includes(name.toLowerCase()));
-            return nutrient ? `${nutrient.value.toFixed(1)} ${nutrient.unitName}` : 'N/A';
-        };
-
-        const calories = getNutrient('energy');
-        const protein = getNutrient('protein');
-        const carbs = getNutrient('carbohydrate');
-        const fat = getNutrient('total lipid');
-
-        return `
-            <div class="usda-result-card" onclick="window.open('https://fdc.nal.usda.gov/fdc-app.html#/food-details/${food.fdcId}/nutrients', '_blank')">
-                <div class="usda-result-title">${food.description || 'Unknown Food'}</div>
-                <div class="usda-result-meta">
-                    <span class="usda-result-badge">${food.dataType || 'Unknown'}</span>
-                    ${food.brandOwner ? `<span>Brand: ${food.brandOwner}</span>` : ''}
-                </div>
-                ${nutrients.length > 0 ? `
-                    <div class="usda-result-nutrients">
-                        <div class="usda-nutrient-item">
-                            <span class="usda-nutrient-label">Calories</span>
-                            <span class="usda-nutrient-value">${calories}</span>
-                        </div>
-                        <div class="usda-nutrient-item">
-                            <span class="usda-nutrient-label">Protein</span>
-                            <span class="usda-nutrient-value">${protein}</span>
-                        </div>
-                        <div class="usda-nutrient-item">
-                            <span class="usda-nutrient-label">Carbs</span>
-                            <span class="usda-nutrient-value">${carbs}</span>
-                        </div>
-                        <div class="usda-nutrient-item">
-                            <span class="usda-nutrient-label">Fat</span>
-                            <span class="usda-nutrient-value">${fat}</span>
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    }
-
-    function showMessage(message, type) {
-        const container = document.getElementById('usda-results-container');
-        const className = type === 'error' ? 'error' : 'success';
-        container.innerHTML = `
-            <div class="usda-empty-state">
-                <p style="color: ${type === 'error' ? COLORS.error : COLORS.success}">${message}</p>
-            </div>
-        `;
-    }
-
-    // Initialize the app
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', createMainUI);
-    } else {
-        createMainUI();
-    }
-})();
+        document.addEventListener('
