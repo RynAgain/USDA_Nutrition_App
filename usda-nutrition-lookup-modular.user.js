@@ -16,8 +16,8 @@
 // @require      https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/JS/Settings.js
 // @require      https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/JS/Dragging.js
 // @require      https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/JS/DetailView.js
-// @updateURL    https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/usda-nutrition-lookup.user.js
-// @downloadURL  https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/usda-nutrition-lookup.user.js
+// @updateURL    https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/usda-nutrition-lookup-modular.user.js
+// @downloadURL  https://raw.githubusercontent.com/RynAgain/USDA_Nutrition_App/main/usda-nutrition-lookup-modular.user.js
 // @supportURL   https://github.com/RynAgain/USDA_Nutrition_App/issues
 // @homepageURL  https://github.com/RynAgain/USDA_Nutrition_App
 // ==/UserScript==
